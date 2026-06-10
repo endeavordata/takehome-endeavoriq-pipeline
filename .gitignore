@@ -1,0 +1,20 @@
+# Generated data — do not commit
+drop/
+billing/
+state/
+*.duckdb
+*.duckdb.wal
+
+# dbt
+transform/target/
+transform/logs/
+transform/dbt_packages/
+**/.user.yml
+
+# Python / env
+__pycache__/
+*.pyc
+.venv/
+venv/
+.env
+.DS_Store

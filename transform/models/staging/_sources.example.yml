@@ -1,0 +1,13 @@
+# Example only — rename to _sources.yml and edit to match the raw tables YOUR EL lands.
+# (Your raw table names are your choice; this just shows the shape.)
+version: 2
+
+sources:
+  - name: raw
+    description: Raw tables landed by your extract-load step.
+    schema: main          # DuckDB default schema
+    tables:
+      - name: raw_accounts
+      - name: raw_subscriptions
+      - name: raw_users
+      # - name: ... (one per source table you land)

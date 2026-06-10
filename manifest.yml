@@ -1,0 +1,53 @@
+# Source-faithfulness manifest — FILL THIS IN.
+#
+# For each source entity below, declare:
+#   model:   the table/model in your DuckDB that is meant to be 1:1 faithful to that source
+#   key:     that model's primary-key column
+#   columns: map each canonical column (left) to YOUR column name (right)
+#
+# Our harness reads this and compares your tables to the true current source state: the set of
+# keys (so deletes must be handled), row counts, and the values of the canonical columns. Naming
+# and modeling are up to you — the manifest is how we line your columns up with ours.
+#
+# The canonical columns we check are listed for each entity. Replace every TODO.
+sources:
+  app.accounts:
+    model: TODO
+    key: TODO
+    columns: {id: TODO, status: TODO}
+  app.subscriptions:
+    model: TODO
+    key: TODO
+    columns: {id: TODO, plan_id: TODO, status: TODO, seats: TODO}
+  app.users:
+    model: TODO
+    key: TODO
+    columns: {id: TODO, account_id: TODO, status: TODO}
+  app.subscription_changes:
+    model: TODO
+    key: TODO
+    columns: {id: TODO}
+  app.plans:
+    model: TODO
+    key: TODO
+    columns: {id: TODO, seat_price_cents: TODO}
+  billing.customers:
+    model: TODO
+    key: TODO
+    columns: {id: TODO, account_id: TODO}   # account_id = metadata.account_id (NULL when absent)
+  billing.invoices:
+    model: TODO
+    key: TODO
+    columns: {id: TODO, status: TODO, total: TODO}
+  billing.charges:
+    model: TODO
+    key: TODO
+    columns: {id: TODO, status: TODO, amount: TODO}
+  billing.refunds:
+    model: TODO
+    key: TODO
+    columns: {id: TODO, amount: TODO}
+  usage.events:
+    model: TODO
+    key: TODO
+    columns: {event_id: TODO, quantity: TODO}
