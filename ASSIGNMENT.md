@@ -127,22 +127,29 @@ The metering source of truth.
 
 ## 4. The CDC mechanic — how to exercise incremental loads
 
-`make seed` lays down history. To simulate the source systems *changing*, advance time:
+`make seed` lays down the back-history. The simulated clock then sits still — nothing changes
+until you advance it with `tick`:
 
 ```bash
-make tick DAYS=14    # advances simulated time: new signups, seat/plan changes, churns,
-                     # user hard-deletes, new invoices, new usage files (+ a late-arriving one)
+make tick DAYS=14    # advance the simulated clock by 14 days
 ```
 
-The intended loop:
-1. `make seed`, run your pipeline (full load).
-2. `make tick DAYS=14`.
-3. Run your pipeline again — it should **capture the changes** (including deletes) **without
-   duplicating or losing rows**, and a run with **no tick in between should change nothing**
-   (idempotent).
+`DAYS=N` is simply **how far to move the clock forward**: the simulator replays `N` days of normal
+activity — new signups, seat/plan changes, churns (account soft-deletes), GDPR user hard-deletes,
+newly-closed invoices, and one usage file per day (plus, on the *first* tick, a late-arriving file
+for a day before the seed boundary). The number isn't special — `14` is just an example; any
+positive integer works, and a larger `N` simply accumulates more change for your next load to pick
+up. Because the clock only moves when you run `tick`, you control exactly when the sources change.
 
-The simulator is deterministic, but **don't hardcode anything to specific values** — we grade
-against a freshly generated world.
+The intended loop:
+1. `make seed`, then run your pipeline (full load).
+2. `make tick DAYS=14` — or any `N` — to move the world forward.
+3. Run your pipeline again — it should **capture the changes** (including deletes) **without
+   duplicating or losing rows**. And running it again with **no tick in between should change
+   nothing** (idempotent).
+
+The simulator is deterministic for a given seed, but **don't hardcode anything to specific values
+or row counts** — we grade against a freshly generated world.
 
 ---
 
