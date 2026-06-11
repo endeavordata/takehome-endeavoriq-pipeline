@@ -94,14 +94,23 @@ control** — they are messy in realistic ways.
 The product's operational DB and the subscription source of truth.
 `accounts`, `users`, `plans`, `subscriptions`, `subscription_changes`, plus `users_cdc`.
 
-- Every table has `created_at` / `updated_at`; `accounts`/`subscriptions` have `deleted_at`
-  (soft delete, set on churn).
-- **`users` rows are *hard*-deleted** (GDPR erasure) — they vanish from the table with no flag.
-  A **`users_cdc` audit log** (`seq, op ∈ {I,U,D}, …, changed_at`) records every insert/update/
-  delete, so deletes are recoverable there.
-- `plans` is **effective-dated** (`effective_from`/`effective_to`/`is_current`) — prices change
-  over time, so "the plan as of date X" matters.
-- `subscriptions` mutate in place (seat/plan/status changes); `subscription_changes` logs them.
+- Every table has `created_at` and `updated_at`. `accounts` and `subscriptions` also have a
+  `deleted_at` column: when one churns, its row is **not** removed — `deleted_at` is set to the
+  churn timestamp and the row stays in the table (a *soft delete*). A non-NULL `deleted_at` is how
+  you tell something is gone.
+- **`users` rows are *hard*-deleted** (GDPR erasure): a deleted user's row simply disappears from
+  `users`, with no flag left behind. A separate **`users_cdc` audit log** records every change —
+  each row has a monotonically increasing `seq`, an `op` of `I`, `U`, or `D` (insert / update /
+  delete), the user's column values, and a `changed_at`. So even after a user vanishes from
+  `users`, its `D` row in the log tells you it existed and when it was removed.
+- `plans` is **effective-dated**: a single plan tier can have several rows over time, each valid
+  for a date range (`effective_from` to `effective_to`, with `is_current` marking the latest).
+  Prices change, so to value a subscription in a given month you need the plan row that was in
+  effect *that* month — not necessarily the current one.
+- A `subscriptions` row is **updated in place** when its seats, plan, or status change, so the
+  table only ever shows each subscription's *current* state. The history of those changes lives in
+  `subscription_changes` (one row per change, with the old and new values). To know what a
+  subscription looked like in a past month, you reconstruct it from that log.
 
 ### B. Billing provider API — **REST** (`billing-api`, `http://localhost:8080`)
 A Stripe-flavored, read-only API over the billing system. The money source of truth.
@@ -109,8 +118,11 @@ A Stripe-flavored, read-only API over the billing system. The money source of tr
 
 - **Cursor pagination**: `?limit=100&starting_after=<id>`, response has `has_more`. You must
   page through everything.
-- Timestamps are **epoch seconds**; amounts are **integer cents**.
-- Invoice **line items are nested** under `lines.data` (subscription + usage lines).
+- Timestamps are **epoch seconds** (Unix time, e.g. `1725148800`), not ISO date strings. Money
+  amounts are **integer cents** (e.g. `2800` means $28.00) — convert the unit before comparing
+  against other sources.
+- An invoice's **line items are nested** inside the invoice object, under `lines.data` — a mix of
+  subscription and usage lines that you'll want to pull out into their own rows.
 - `customer.metadata.account_id` links a billing customer to an app account — but it is
   **sometimes absent** (you may be able to recover the link another way; some can't be linked
   at all).
@@ -119,9 +131,14 @@ A Stripe-flavored, read-only API over the billing system. The money source of tr
 One file per day, one JSON object per line (`event_id, account_id, usage_date, metric, quantity`).
 The metering source of truth.
 
-- Lines may be **out of order**; a field may **appear partway through history** (schema drift);
-  a file may contain **duplicate lines**; some days' files may be **missing**; and after a
-  `tick` (below) a file for an **earlier date can arrive late**.
+Each file is messy in a few realistic ways:
+- Lines within a file may be **out of order** — don't assume they're sorted by time.
+- A new field **appears partway through the history** ("schema drift"): files from before it was
+  added simply don't have that column.
+- A file may contain **duplicate lines** — the same `event_id` appearing more than once.
+- Some days' files are **missing** entirely — a real gap, not an error to fail on.
+- After a `tick` (below), a file for an **earlier date can arrive late** — so a day you already
+  loaded can gain new events on a later run.
 
 ---
 
