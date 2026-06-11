@@ -4,7 +4,7 @@ Welcome, and thanks for taking the time. This exercise gives us a realistic look
 build a data pipeline: pulling from messy, heterogeneous source systems, loading
 incrementally, modeling with dbt, and reasoning about data quality.
 
-**Plan for about 5 hours.** You may spend more if you want, but please don't feel obligated.
+**Plan for about 3–4 hours.** You may spend more if you want, but please don't feel obligated.
 AI assistance is encouraged (see "Using AI" below), so the plumbing can go quickly — we'd rather
 you spend your time on EL/CDC correctness, modeling judgment, and sanity-checking outputs than
 grinding through boilerplate. We would much rather see a clean, correct *slice* done well than
@@ -162,16 +162,32 @@ tables to the source regardless of how you named things.
 1:1 with the sources. Add `schema.yml` tests (unique / not_null / relationships / accepted_values)
 and at least one or two custom data-quality checks targeting issues you find.
 
+> Keep staging **faithful to the source as-is** — e.g. `billing.customers.account_id` is the raw
+> `metadata.account_id`, left **NULL when the source has none**. Recovering the missing links
+> (task 4 below) belongs in a **downstream** model, not staging. (Our objective check in §6 reads
+> the source-faithful layer, so don't back-fill recovered values into it.)
+
 **4. The mart that matters — `fct_revenue`.** Recognized revenue per **account × month**:
 **recurring** (subscription seats × plan price, with **annual plans normalized to monthly**)
 **plus** **usage** overage, with MRR-movement classification (new / expansion / contraction /
-churn). Getting this right needs point-in-time subscription/plan state and the cross-source joins.
+churn). Getting this right needs point-in-time subscription/plan state and the cross-source joins
+(this is also where you **recover** the billing↔account links that were absent in staging — by
+domain/email or otherwise; some customers are genuinely unlinkable, and that's fine, don't drop them).
+
+> **MRR movement has genuine definitional ambiguity** — e.g. is a plan downgrade at flat seats a
+> contraction? Is a reactivation after churn "new" or "reactivation"? There's no single right
+> answer. **Pick a defensible convention and state it in your writeup.** We grade the *reasoning
+> and consistency*, not a match to one canonical answer.
 
 **5. Writeup (`WRITEUP.md`).** Brief: your EL/CDC strategy, the data-quality issues you found,
 key modeling decisions, and **what you'd do with more time / how you'd productionize** (orchestration,
 scheduling, alerting, the parts you stubbed). Include **how you used AI** (2–3 sentences): where it
 helped, and at least one place where it was wrong, incomplete, or you overrode it. We're not testing
 *whether* you used AI — we're testing whether you were driving. Write it in your own voice.
+
+> **Flag what's wrong or unfinished.** A clearly called-out bug or gap ("I didn't get late-arriving
+> usage files reloading correctly — here's the symptom and how I'd fix it") counts for **more** than
+> the same problem shipped silently. We reward knowing where your pipeline is weak.
 
 ### Stretch (optional, no penalty if skipped)
 - A **reconciliation** model: billed (invoices) vs collected (charges) vs expected (subscriptions).
@@ -193,17 +209,20 @@ Two tiers:
   **row counts**, and **values** on the declared columns. We run this after a full load, after a
   `tick` (tests incremental + deletes), and on a no-tick re-run (tests idempotency). This scores
   EL correctness without caring about your modeling choices.
-- **Judgment.** Your `fct_revenue` logic, dbt structure/naming, test coverage, and writeup.
+- **Judgment.** Your `fct_revenue` logic, dbt structure/naming, test coverage, and writeup. For
+  `fct_revenue`/MRR there's no canonical answer we diff against — we judge whether your convention
+  is **defensible, consistent, and documented**.
 
 | | Weight | What we look at |
 |---|---|---|
 | EL correctness & robustness | 30% | incremental, idempotent, deletes captured, pagination/files handled |
-| dbt modeling & `fct_revenue` | 25% | layering, grain, SCD/point-in-time, annual normalization |
+| dbt modeling & `fct_revenue` | 25% | layering, grain, SCD/point-in-time, annual normalization, **defensible documented MRR choice** |
 | Data-quality rigor | 20% | tests + which issues you caught & documented |
 | Reproducibility | 10% | one clean command, no manual fixups |
-| Writeup & judgment | 15% | priorities, honest gaps, productionization plan |
+| Writeup & judgment | 15% | priorities, **honestly flagged gaps/bugs**, productionization plan |
 
-We do **not** grade on whether you finished everything, or on EL tool choice.
+We do **not** grade on whether you finished everything, or on EL tool choice. A submission that
+**names its own gaps and bugs** scores above one that looks polished but is silently wrong.
 
 ---
 
